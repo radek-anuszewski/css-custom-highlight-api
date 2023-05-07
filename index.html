@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>CSS Custom Highlight</title>
+	<style>
+		body {
+				padding: 40px;
+				width: 100%;
+				max-width: 640px;
+		}
+
+		label, input[type="checkbox"] {
+				cursor: pointer;
+		}
+
+    ::highlight(pink) {
+        background-color: deeppink;
+        color: white;
+    }
+
+    ::highlight(blue) {
+        background-color: blue;
+        color: white;
+    }
+
+    ::highlight(search-results) {
+        background-color: green;
+        color: white;
+    }
+	</style>
+	<script>
+    if (!CSS.highlights) {
+      alert('Your browser does not support CSS Highlights! Example will not work')
+    }
+	</script>
+	<script type="module">
+		const checkboxes = [...document.querySelectorAll('input[name="highlight"]')];
+    const text = document.querySelector('#text');
+
+    const getRangeBound = (color) => {
+      const textContent = text.textContent.toLowerCase();
+      const startPosition = textContent.indexOf(`check ${color}`);
+      const endText = `me ${color}`;
+      const endPosition = textContent.indexOf(endText) + endText.length;
+      return { startPosition, endPosition };
+    }
+
+    const getHighlightRange = (color) => {
+      const range = new Range();
+      const { startPosition, endPosition } = getRangeBound(color);
+      range.setStart(text.firstChild, startPosition);
+      range.setEnd(text.firstChild, endPosition);
+      return range;
+    }
+
+    const toggleHighlight = (color, checked) => {
+			if (!checked) {
+        CSS.highlights.delete(color);
+        return;
+			}
+
+      const range = getHighlightRange(color);
+      CSS.highlights.set(color, new Highlight(range));
+		}
+
+    checkboxes.forEach(checkbox => {
+      checkbox.addEventListener('change', e => {
+        const color = e.target.id;
+        toggleHighlight(color, e.target.checked);
+			})
+		});
+	</script>
+	<script type="module">
+		const users = [
+      { name: 'Radek', surname: 'Anuszewski', occupation: 'Front-end developer' },
+      { name: 'John', surname: 'Smith', occupation: 'Back-end developer' },
+      { name: 'Jan', surname: 'Schmidt', occupation: 'Driver' },
+		];
+
+    const tableBody = document.querySelector('tbody');
+    const searchField = document.querySelector('#search');
+    const fillTable = users => {
+      tableBody.innerHTML = users.map(user => (
+        `<tr>
+					<td>${user.name}</td>
+					<td>${user.surname}</td>
+					<td>${user.occupation}</td>
+				</tr>`
+			)).join('');
+		};
+    fillTable(users) // initial display
+
+    const filterUsers = (users, searchString) => {
+      return users.filter(user => user.name.toLowerCase().includes(searchString)
+        || user.surname.toLowerCase().includes(searchString)
+				|| user.occupation.toLowerCase().includes(searchString));
+		}
+
+    searchField.addEventListener('input', e => {
+      const searchString = e.target.value.toLowerCase();
+      if (!searchString) {
+        CSS.highlights.delete("search-results");
+        fillTable(users);
+			}
+      const filteredUsers = filterUsers(users, searchString);
+      fillTable(filteredUsers);
+			highlightSearchText(searchString);
+		});
+
+    // almost copied from an example from https://developer.mozilla.org/en-US/docs/Web/API/CSS_Custom_Highlight_API
+    const highlightSearchText = (searchString) => {
+      CSS.highlights.delete("search-results");
+      const treeWalker = document.createTreeWalker(tableBody, NodeFilter.SHOW_TEXT);
+      const allTextNodes = [];
+      let currentNode = treeWalker.nextNode();
+      while (currentNode) {
+        allTextNodes.push(currentNode);
+        currentNode = treeWalker.nextNode();
+      }
+      const ranges = allTextNodes
+        .map((el) => {
+          return { el, text: el.textContent.toLowerCase() };
+        })
+        .map(({ text, el }) => {
+          const indices = [];
+          let startPos = 0;
+          while (startPos < text.length) {
+            const index = text.indexOf(searchString, startPos);
+            if (index === -1) break;
+            indices.push(index);
+            startPos = index + searchString.length;
+          }
+
+          // Create a range object for each instance of
+          // str we found in the text node.
+          return indices.map((index) => {
+            const range = new Range();
+            range.setStart(el, index);
+            range.setEnd(el, index + searchString.length);
+            return range;
+          });
+        });
+
+      // Create a Highlight object for the ranges.
+      const searchResultsHighlight = new Highlight(...ranges.flat());
+
+      // Register the Highlight object in the registry.
+      CSS.highlights.set("search-results", searchResultsHighlight);
+		}
+	</script>
+</head>
+<body>
+<main>
+	<h1>CSS Custom Highlight API</h1>
+	<article>
+		<h2>Simple use case</h2>
+		<fieldset>
+			<legend>Boxes - click them to highlight text:</legend>
+			<label for="pink">Pink <input name="highlight" type="checkbox" id="pink"></label>
+			<br>
+			<label for="blue">Blue <input name="highlight" type="checkbox" id="blue"></label>
+		</fieldset>
+		<br>
+		<div id="text">Just some text. Check pink box to make me pink or check blue box to make me blue </div>
+	</article>
+	<article>
+		<h2>Real world use case</h2>
+		<label for="search">Search in table</label>
+		<input type="search" id="search">
+		<br><br>
+		<table>
+			<caption>People</caption>
+			<thead>
+			<tr>
+				<th>Name</th>
+				<th>Surname</th>
+				<th>Occupation</th>
+			</tr>
+			</thead>
+			<tbody></tbody>
+		</table>
+	</article>
+</main>
+</body>
+</html>
